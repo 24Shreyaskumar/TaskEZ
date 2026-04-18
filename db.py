@@ -8,7 +8,7 @@ class Database:
         '''Initialize DB Connection'''
         self.conn = sqlite3.connect(db_name)
         self.conn.execute("PRAGMA foreign_keys = ON") # to support foreign key references
-        self.conn.row_factory = sqlite3.Row()
+        self.conn.row_factory = sqlite3.Row
 
     def execute(self, query, params=()):
         '''Execute given DB command'''

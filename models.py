@@ -1,3 +1,5 @@
+'''Model Views'''
+
 from enum import Enum
 from datetime import datetime, timezone
 
@@ -9,9 +11,11 @@ class User:
 
 class Task:
     '''Task Model'''
-    def __init__(self, task_name, task_id=None):
+    def __init__(self, task_name, task_score=0, task_id=None, deadline=None):
         self.task_id: int = task_id
         self.task_name: str = task_name
+        self.task_score: int = task_score
+        self.task_deadline: datetime = deadline
 
 class SubmissionStatus(Enum):
     '''Submission Staus mapping'''
@@ -41,3 +45,8 @@ class Review:
         self.submission_id: int = submission_id
         self.review_status: ReviewType = ReviewType(review_type.upper())
         self.timestamp: datetime = datetime.now(timezone.utc)
+
+class MapReviewToSubmission(Enum):
+    '''Map Review status to Submission status'''
+    APPROVE = "APPROVED"
+    REJECT  = "REJECTED"

@@ -60,13 +60,16 @@ class TaskRepository:
         self.db.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
                 task_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                task_name TEXT NOT NULL)
+                task_name TEXT NOT NULL,
+                task_score INTEGER DEFAULT 0,
+                task_deadline DATETIME DEFAULT NULL)
         """)
 
-    def add_task(self, task_name):
+    def add_task(self, task_name, task_score=0, task_deadline=None):
         '''add task to tasks'''
         cursor = self.db.execute("""
-            INSERT INTO tasks (task_name) VALUES (?)""", (task_name,)
+            INSERT INTO tasks (task_name, task_score, task_deadline) VALUES (?, ?, ?)""", 
+            (task_name, task_score, task_deadline,)
         )
 
         return cursor.lastrowid
@@ -127,6 +130,14 @@ class SubmissionRepository:
 
         return cursor.lastrowid
 
+    def update_submission_status(self, submission_id, submission_status):
+        '''Update the submission status for a submission that was already made'''
+        self.db.execute("""
+            UPDATE submissions SET status = (?) WHERE submission_id = (?)""",
+            (submission_status, submission_id))
+
+        return self.get_submission(submission_id)
+
     def get_submission(self, submission_id):
         '''get the given submission from submissions'''
         cursor = self.db.execute("""
@@ -134,6 +145,14 @@ class SubmissionRepository:
         )
 
         return cursor.fetchone()
+
+    def get_submissions_status(self, status="PENDING"):
+        '''Get all the submission records, whose submission status is  -
+        PENDING / APPROVED / REJECTED'''
+        cursor = self.db.execute("""
+            SELECT * FROM submissions WHERE status = (?)""", (status,))
+
+        return cursor
 
     def delete_submission(self, submission_id):
         '''delete a given submission from submissions'''
