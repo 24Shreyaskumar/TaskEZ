@@ -27,7 +27,7 @@ class Submission:
         self.task_id: int = task_id
         self.status: SubmissionStatus = SubmissionStatus.PENDING
         self.completion_time: datetime = datetime.now(timezone.utc)
-    
+
 class ReviewType(Enum):
     '''Review Status mapping'''
     APPROVE = "APPROVE"
