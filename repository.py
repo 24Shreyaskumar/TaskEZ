@@ -26,7 +26,7 @@ class UserRepository:
     def get_user(self, user_id):
         '''get given user from users'''
         cursor = self.db.execute("""
-            SELECT * FROM users WHERE user_id = (?)""", (user_id,)
+            SELECT * FROM users WHERE user_id = ?""", (user_id,)
         )
 
         return cursor.fetchone()
@@ -42,7 +42,7 @@ class UserRepository:
     def delete_user(self, user_id):
         '''delete given user from users'''
         self.db.execute("""
-            DELETE FROM users WHERE user_id = (?)""", (user_id,)
+            DELETE FROM users WHERE user_id = ?""", (user_id,)
         )
 
     def reset_table(self):
@@ -76,7 +76,7 @@ class TaskRepository:
     def add_task(self, task_name, task_score=0, task_deadline=None):
         '''add task to tasks'''
         cursor = self.db.execute("""
-            INSERT INTO tasks (task_name, task_score, task_deadline) VALUES (?, ?, ?)""", 
+            INSERT INTO tasks (task_name, task_score, task_deadline) VALUES (?, ?, ?)""",
             (task_name, task_score, task_deadline,)
         )
 
@@ -85,7 +85,7 @@ class TaskRepository:
     def get_task(self, task_id):
         '''get a task from tasks'''
         cursor = self.db.execute("""
-            SELECT * FROM tasks WHERE task_id = (?)""", (task_id,)
+            SELECT * FROM tasks WHERE task_id = ?""", (task_id,)
         )
 
         return cursor.fetchone()
@@ -93,7 +93,7 @@ class TaskRepository:
     def delete_task(self, task_id):
         '''delete given task from tasks'''
         self.db.execute("""
-            DELETE FROM tasks WHERE task_id = (?)""", (task_id,)
+            DELETE FROM tasks WHERE task_id = ?""", (task_id,)
         )
 
     def reset_table(self):
@@ -126,8 +126,8 @@ class SubmissionRepository:
                         
                 CHECK (status in ('PENDING', 'APPROVED', 'REJECTED')),
         
-                FOREIGN KEY (user_id) REFERENCES users(user_id),
-                FOREIGN KEY (task_id) REFERENCES tasks(task_id))""")
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE)""")
 
     def add_submission(self, user_id, task_id):
         '''add given submission into submissions'''
@@ -141,7 +141,7 @@ class SubmissionRepository:
     def update_submission_status(self, submission_id, submission_status):
         '''Update the submission status for a submission that was already made'''
         self.db.execute("""
-            UPDATE submissions SET status = (?) WHERE submission_id = (?)""",
+            UPDATE submissions SET status = ? WHERE submission_id = ?""",
             (submission_status, submission_id))
 
         return self.get_submission(submission_id)
@@ -149,7 +149,7 @@ class SubmissionRepository:
     def get_submission(self, submission_id):
         '''get the given submission from submissions'''
         cursor = self.db.execute("""
-            SELECT * FROM submissions WHERE submission_id = (?)""", (submission_id,)
+            SELECT * FROM submissions WHERE submission_id = ?""", (submission_id,)
         )
 
         return cursor.fetchone()
@@ -158,7 +158,7 @@ class SubmissionRepository:
         '''Get all the submission records, whose submission status is  -
         PENDING / APPROVED / REJECTED'''
         cursor = self.db.execute("""
-            SELECT * FROM submissions WHERE status = (?)""", (status,))
+            SELECT * FROM submissions WHERE status = ?""", (status,))
 
         return cursor.fetchall()
 
@@ -170,7 +170,7 @@ class SubmissionRepository:
             submission_id = ?""",
             (submission_id,))
 
-        return cursor.fetchone()
+        return cursor.fetchone()[0]
 
     def get_reviewable_submissions_for_user(self, user_id):
         '''Get reviewable submissions for a user'''
@@ -191,10 +191,28 @@ class SubmissionRepository:
 
         return cursor.fetchall()
 
+    def get_user_score(self, user_id):
+        '''Get overall user score for the Approved submissions'''
+        cursor = self.db.execute("""
+            SELECT SUM(t.task_score)
+            FROM submissions s
+            JOIN tasks t ON s.task_id = t.task_id
+            WHERE
+            s.user_id = ?
+            AND s.status = 'APPROVED'
+            AND (
+                t.task_deadline IS NULL
+                OR
+                s.completion_time <= t.task_deadline)""",
+            (user_id,))
+
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else 0
+
     def delete_submission(self, submission_id):
         '''delete a given submission from submissions'''
         self.db.execute("""
-            DELETE FROM submissions WHERE submission_id = (?)""", (submission_id,)
+            DELETE FROM submissions WHERE submission_id = ?""", (submission_id,)
         )
 
     def reset_table(self):
@@ -228,8 +246,11 @@ class ReviewRepository:
                 UNIQUE(reviewer_id, submission_id),
                 CHECK(review_status in ('APPROVE', 'REJECT')),
                         
-                FOREIGN KEY (reviewer_id) REFERENCES users(user_id),
-                FOREIGN KEY (submission_id) REFERENCES submissions(submission_id))""")
+                FOREIGN KEY (reviewer_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (submission_id) REFERENCES submissions(submission_id) ON DELETE CASCADE)""")
+
+        self.db.execute("""
+            CREATE INDEX idx_reviews_reviewer ON reviews(reviewer_id)""")
 
     def add_review(self, reviewer_id, submission_id, review_status):
         '''add the given review into reviews'''
@@ -244,21 +265,21 @@ class ReviewRepository:
     def get_review(self, review_id):
         '''get the given review from reviews'''
         cursor = self.db.execute("""
-            SELECT * FROM reviews WHERE review_id = (?)""", (review_id,)
+            SELECT * FROM reviews WHERE review_id = ?""", (review_id,)
         )
 
         return cursor.fetchone()
-    
+
     def get_submission_review_by_reviewer_id(self, reviewer_id, submission_id):
         '''Get review by reviewer id'''
         cursor = self.db.execute("""
-            SELECT * FROM review
+            SELECT * FROM reviews
             WHERE
-            reviewer_id = (?)
+            reviewer_id = ?
             AND
-            submission_id = (?)""",
+            submission_id = ?""",
             (reviewer_id, submission_id))
-        
+
         return cursor.fetchone()
 
     def count_reviewers_for_submission(self, submission_id, review_status):
@@ -266,9 +287,9 @@ class ReviewRepository:
         cursor = self.db.execute("""
             SELECT COUNT(*) FROM reviews
             WHERE
-            submission_id = (?)
+            submission_id = ?
             AND
-            review_status = (?)""",
+            review_status = ?""",
             (submission_id, review_status))
 
         return cursor.fetchone()[0]
@@ -276,7 +297,7 @@ class ReviewRepository:
     def delete_review(self, review_id):
         '''delete the given review from reviews'''
         self.db.execute("""
-            DELETE FROM reviews WHERE review_id = (?)""", (review_id,)
+            DELETE FROM reviews WHERE review_id = ?""", (review_id,)
         )
 
     def reset_table(self):

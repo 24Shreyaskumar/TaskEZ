@@ -98,6 +98,10 @@ class PeerReviewService:
 
     def _update_submission_status(self, submission_id):
         '''Update the submission status to APPROVED / PENDING if condition matches'''
+        submission = self._validate_submission(submission_id)
+        if submission["status"] != "PENDING":
+            return
+
         total_approved_reviews = int(self.review_repo.count_reviewers_for_submission(
                                     submission_id,
                                     "APPROVE"))
@@ -142,5 +146,17 @@ class PeerReviewService:
 
         return review
 
-    def get_leaderboard(self):
+    def get_leaderboard(self, users):
         '''Get the leaderboard'''
+        leaderboard = []
+
+        for user in users:
+            total_user_score = self.submission_repo.get_user_score(user.user_id)
+            #score = total_user_score[0]
+            # completion_time = total_user_score[1]
+            leaderboard.append((total_user_score, user.user_id, user.user_name))
+
+        leaderboard = sorted(leaderboard, key=lambda x: -x[0])
+        # update the sorting logic when completion time logic added
+
+        return leaderboard
