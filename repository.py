@@ -31,6 +31,14 @@ class UserRepository:
 
         return cursor.fetchone()
 
+    def count_users(self):
+        '''Count total number of users'''
+        cursor = self.db.execute("""
+            SELECT COUNT(*) FROM users"""
+        )
+
+        return cursor.fetchone()[0]
+
     def delete_user(self, user_id):
         '''delete given user from users'''
         self.db.execute("""
@@ -152,7 +160,36 @@ class SubmissionRepository:
         cursor = self.db.execute("""
             SELECT * FROM submissions WHERE status = (?)""", (status,))
 
-        return cursor
+        return cursor.fetchall()
+
+    def get_submission_user_id(self, submission_id):
+        '''Get the submission user id'''
+        cursor = self.db.execute("""
+            SELECT user_id FROM submissions
+            WHERE
+            submission_id = ?""",
+            (submission_id,))
+
+        return cursor.fetchone()
+
+    def get_reviewable_submissions_for_user(self, user_id):
+        '''Get reviewable submissions for a user'''
+        cursor = self.db.execute("""
+            SELECT * FROM submissions s
+            WHERE
+            s.status = 'PENDING'
+            AND
+            s.user_id != ?
+            AND
+            NOT EXISTS (
+                SELECT 1 FROM reviews r
+                WHERE
+                r.submission_id = s.submission_id
+                AND
+                r.reviewer_id = ?)""",
+            (user_id, user_id,))
+
+        return cursor.fetchall()
 
     def delete_submission(self, submission_id):
         '''delete a given submission from submissions'''
@@ -211,6 +248,30 @@ class ReviewRepository:
         )
 
         return cursor.fetchone()
+    
+    def get_submission_review_by_reviewer_id(self, reviewer_id, submission_id):
+        '''Get review by reviewer id'''
+        cursor = self.db.execute("""
+            SELECT * FROM review
+            WHERE
+            reviewer_id = (?)
+            AND
+            submission_id = (?)""",
+            (reviewer_id, submission_id))
+        
+        return cursor.fetchone()
+
+    def count_reviewers_for_submission(self, submission_id, review_status):
+        '''Count the number of reviews for a given status'''
+        cursor = self.db.execute("""
+            SELECT COUNT(*) FROM reviews
+            WHERE
+            submission_id = (?)
+            AND
+            review_status = (?)""",
+            (submission_id, review_status))
+
+        return cursor.fetchone()[0]
 
     def delete_review(self, review_id):
         '''delete the given review from reviews'''

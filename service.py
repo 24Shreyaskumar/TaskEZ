@@ -1,7 +1,8 @@
 '''Brain of the Project'''
 
+from math import ceil
 from db import Database
-from models import User, Task, Submission, Review, MapReviewToSubmission
+from models import User, Task, Submission, Review
 from repository import UserRepository, TaskRepository, SubmissionRepository, ReviewRepository
 
 class PeerReviewService:
@@ -77,6 +78,10 @@ class PeerReviewService:
 
     def submit_task(self, user_id, task_id):
         '''Submit a task'''
+        # Validate user and task
+        self._validate_user(user_id)
+        self._validate_task(task_id)
+
         submission = Submission(user_id, task_id)
 
         submission_id = self.submission_repo.add_submission(submission.user_id, submission.task_id)
@@ -86,25 +91,43 @@ class PeerReviewService:
 
         return submission
 
-    def get_reviewable_submissions(self, user_id):
+    def get_reviewable_submissions_for_user(self, user_id):
         '''Get the list of pending submissions for a user to review'''
-        pending_requests = self.submission_repo.get_submissions_status(status="PENDING")
-
+        pending_requests = self.submission_repo.get_reviewable_submissions_for_user(user_id)
+        return pending_requests
 
     def _update_submission_status(self, submission_id):
-        # status should be updated only when condition for APPROVE / REJECT passes
-        # submission = self.submission_repo.update_submission_status(
-        #     submission_id,
-        #     submission_status
-        # )
+        '''Update the submission status to APPROVED / PENDING if condition matches'''
+        total_approved_reviews = int(self.review_repo.count_reviewers_for_submission(
+                                    submission_id,
+                                    "APPROVE"))
 
-        # self._validate_submission(submission_id)
-        # return submission
-        pass
+        total_rejected_reviews = int(self.review_repo.count_reviewers_for_submission(
+                                    submission_id,
+                                    "REJECT"))
 
+        reviewable_users = int(self.user_repo.count_users()) - 1
+
+        if total_approved_reviews >= ceil(reviewable_users / 2):
+            self.submission_repo.update_submission_status(submission_id, "APPROVED")
+
+        elif total_rejected_reviews >= ceil(reviewable_users / 2):
+            self.submission_repo.update_submission_status(submission_id, "REJECTED")
+
+    def _validate_reviewer(self, reviewer_id, user_id, submission_id):
+        assert reviewer_id != user_id, "Self review not allowed"
+        self._validate_user(reviewer_id)
+        does_review_exist = self.review_repo.get_submission_review_by_reviewer_id(
+            reviewer_id,
+            submission_id)
+        assert not does_review_exist, \
+            f"Review for {submission_id} by reviewer with reviewer id {reviewer_id} already exists"
 
     def add_review(self, reviewer_id, submission_id, review_type):
         '''Add a review to a submission'''
+        user_id = int(self.submission_repo.get_submission_user_id(submission_id))
+        self._validate_reviewer(reviewer_id, user_id, submission_id)
+
         review = Review(submission_id, reviewer_id, review_type)
 
         review_id = self.review_repo.add_review(
